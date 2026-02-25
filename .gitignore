@@ -1,3 +1,6 @@
+# temporary files
+**/tmp/
+
 # Compiled class file
 *.class
 

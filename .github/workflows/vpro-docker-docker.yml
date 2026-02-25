@@ -1,0 +1,128 @@
+name: vProfile Docker Build CI (docker)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/vpro-docker-docker.yml'
+      - 'vprofile-docker/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/vpro-docker-docker.yml'
+      - 'vprofile-docker/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: [self-hosted, Linux, X64, ci]
+    defaults:
+      run:
+        working-directory: vprofile-docker
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      - name: Build
+        run: |
+          # mvn install -DskipTests
+          echo "Build step - placeholder for actual build commands"
+
+      # - name: Upload Build Artifacts (WAR)
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: vprofile-app
+      #     path: target/*.war
+
+      - name: Notify if Build Fails
+        if: failure()
+        run: |
+          echo "Build job failed! Please check the logs."
+
+  testing:
+    runs-on: [self-hosted, Linux, X64, ci]
+    needs: build
+    defaults:
+      run:
+        working-directory: vprofile-docker
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      - name: Run tests
+        run: |
+          # mvn test
+          echo "Testing step - placeholder for actual test commands"
+
+      - name: Checkstyle
+        run: |
+          # mvn checkstyle:check
+          echo "Checkstyle step - placeholder for actual checkstyle commands"
+
+  # security_scan:
+  #   runs-on: [self-hosted, Linux, X64, ci]
+  #   needs: build
+  #   defaults:
+  #     run:
+  #       working-directory: vprofile-docker
+  #   steps:
+  #     - name: Code Checkout
+  #       uses: actions/checkout@v5
+
+  #     - name: Trivy Filesystem Scan
+  #       uses: aquasecurity/trivy-action@0.28.0
+  #       with:
+  #         scan-type: fs
+  #         scan-ref: .
+  #         format: json
+  #         exit-code: 0
+  #         vuln-type: os, library
+  #         output: trivy-results.json
+
+  #     - name: Upload Trivy Scan Results
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: trivy-scan-results
+  #         path: trivy-results.json
+
+  build-and-push:
+    runs-on: [self-hosted, Linux, X64, ci]
+    defaults:
+      run:
+        working-directory: vprofile-docker
+    environment: production
+    needs: [build, testing]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v5
+
+      - name: Configur AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to AWS ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image and push to AWS ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          ECR_REPOSITORY: ${{ vars.AWS_ECR_REPOSITORY_NAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          DOCKERFILE_PATH="./Docker-files/app/multistage/Dockerfile"
+
+          DOCKER_BUILDKIT=0 docker build -f "$DOCKERFILE_PATH" -t "$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT

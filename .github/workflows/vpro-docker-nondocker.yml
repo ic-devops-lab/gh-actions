@@ -1,4 +1,4 @@
-name: vProfile Docker Build CI
+name: vProfile Docker Build CI (non-docker)
 
 on:
   workflow_dispatch:
@@ -6,13 +6,13 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/vpro-docker-main.yml'
+      - '.github/workflows/vpro-docker-nondocker.yml'
       - 'vprofile-docker/**'
   pull_request:
     branches:
       - main
     paths:
-      - '.github/workflows/vpro-docker-main.yml'
+      - '.github/workflows/vpro-docker-nondocker.yml'
       - 'vprofile-docker/**'
 
 permissions:
@@ -46,6 +46,7 @@ jobs:
 
   testing:
     runs-on: [self-hosted, Linux, X64, ci]
+    needs: build
     defaults:
       run:
         working-directory: vprofile-docker
@@ -62,3 +63,29 @@ jobs:
         run: |
           # mvn checkstyle:check
           echo "Checkstyle step - placeholder for actual checkstyle commands"
+
+  # security_scan:
+  #   runs-on: [self-hosted, Linux, X64, ci]
+  #   needs: build
+  #   defaults:
+  #     run:
+  #       working-directory: vprofile-docker
+  #   steps:
+  #     - name: Code Checkout
+  #       uses: actions/checkout@v5
+
+  #     - name: Trivy Filesystem Scan
+  #       uses: aquasecurity/trivy-action@0.28.0
+  #       with:
+  #         scan-type: fs
+  #         scan-ref: .
+  #         format: json
+  #         exit-code: 0
+  #         vuln-type: os, library
+  #         output: trivy-results.json
+
+  #     - name: Upload Trivy Scan Results
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: trivy-scan-results
+  #         path: trivy-results.json
